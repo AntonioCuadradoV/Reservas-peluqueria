@@ -61,7 +61,7 @@ footer button{background:none;border:0;color:var(--mute);font-size:12px}
 <body>
 <header><div class="logo" id="lg"></div><div class="brand"><b id="nm"></b><small>Reservas online</small></div></header>
 <main id="app"></main>
-<footer><button id="adm">Administrar</button></footer>
+<footer><button id="adm" hidden>Volver a reservas</button></footer>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -126,7 +126,7 @@ onAuthStateChanged(auth, u => {
 
 function render() {
   const el = document.getElementById("app");
-  document.getElementById("adm").textContent = view === "admin" ? "Volver a reservas" : "Administrar";
+  document.getElementById("adm").hidden = view !== "admin";
   el.innerHTML = view === "admin" ? adminHtml() : clientHtml();
   bind();
 }
@@ -234,7 +234,8 @@ async function reservar() {
   }
 }
 
-document.getElementById("adm").onclick = () => { view = view === "admin" ? "cliente" : "admin"; msg = ""; showAll = false; selDay = null; step = 1; render(); };
+document.getElementById("adm").onclick = () => { history.replaceState(null, "", location.pathname + location.search); view = "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); };
+window.addEventListener("hashchange", () => { view = location.hash === "#admin" ? "admin" : "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); });
 render();
 </script>
 </body>
