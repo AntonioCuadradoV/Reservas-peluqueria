@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Barbería · Reservá tu turno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap">
+<style>
+:root{color-scheme:dark;--bg:#09090b;--card:#0f0f12;--card2:#141418;--line:#26262c;--ink:#f4f4f5;--mute:#8b8b95;--err:#f08a8a;--ok:#8fd3a4;
+--serif:"Playfair Display",Georgia,"Times New Roman",serif}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+header{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.logo{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font:600 20px var(--serif)}
+.brand b{display:block;font:600 18px var(--serif)}
+.brand small{color:var(--mute);font-size:12px}
+main{max-width:480px;margin:0 auto;padding:20px 16px 20px}
+.intro{text-align:center;color:var(--mute);margin:8px 0 6px}
+.step{text-align:center;color:var(--mute);font-size:13px;margin-bottom:16px}
+.step b{color:var(--ink);font-weight:500}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 16px}
+h2{font:500 22px var(--serif);margin:0 0 16px}
+button{font:inherit;color:inherit;cursor:pointer}
+.dates{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.date{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 0;text-align:center}
+.date small{display:block;color:var(--mute);font-size:11px;letter-spacing:.06em}
+.date b{display:block;font:500 22px var(--serif);margin:2px 0}
+.date:disabled{opacity:.35;cursor:not-allowed}
+.date.sel{border-color:var(--ink)}
+.times{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.time{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:14px 0;text-align:center}
+.time.off{opacity:.4;text-decoration:line-through}
+.more{margin-top:12px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.hint{color:var(--mute);font-size:13px;margin:12px 0 0}
+.err{color:var(--err);font-size:14px;margin:12px 0 0}
+.good{color:var(--ok)}
+.back{display:inline-flex;margin-top:18px;background:none;border:0;color:var(--mute);padding:4px 0}
+.sum{margin-bottom:14px}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.sum span{color:var(--mute)}
+label{display:block;margin:14px 0 6px;font-size:13px;color:var(--mute)}
+input,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink);font:inherit}
+.btn{width:100%;margin-top:18px;padding:14px;border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:600}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sec{background:var(--card2);color:var(--ink);border:1px solid var(--line)}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{flex:1;padding:10px 6px;font-size:14px;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
+.tab.sel{border-color:var(--ink)}
+.res{border:1px solid var(--line);border-radius:12px;background:var(--card2);padding:12px;margin-bottom:10px}
+.res b{display:block;font:500 17px var(--serif)}
+.res p{margin:4px 0;color:var(--mute);font-size:14px}
+.res a{color:var(--ink)}
+.res button{margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--err)}
+.hours{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:14px}
+.hours b{display:block;font:500 17px var(--serif);margin-bottom:8px}
+.hours div{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--mute)}
+.hours div span:last-child{color:var(--ink)}
+.item{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:16px 14px;margin-bottom:10px}
+.item b{display:flex;justify-content:space-between;gap:12px;font:500 18px var(--serif)}
+.item:hover{border-color:var(--ink)}
+footer{text-align:center;padding:8px 16px 28px}
+footer button{background:none;border:0;color:var(--mute);font-size:12px}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<header><div class="logo" id="lg"></div><div class="brand"><b id="nm"></b><small>Reservas online</small></div></header>
+<main id="app"></main>
+<footer><button id="adm" hidden>Volver a reservas</button></footer>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, doc, onSnapshot, writeBatch, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// === Configuración ===
+const firebaseConfig = {
+  apiKey: "AIzaSyC-IFjQyHClAmEeEJiDrb88j61ZMvN7Plg",
+  authDomain: "peluqueria-reservas-3c1a0.firebaseapp.com",
+  projectId: "peluqueria-reservas-3c1a0",
+  storageBucket: "peluqueria-reservas-3c1a0.firebasestorage.app",
+  messagingSenderId: "972935083950",
+  appId: "1:972935083950:web:18cc2e783c51e4f2a4ba3f"
+};
+const NOMBRE = "Barbería";            // nombre que se muestra arriba
+const SERVICIOS = [
+  { id: "corte", n: "Corte", def: 8000 },
+  { id: "corteybarba", n: "Corte y barba" },
+  { id: "barba", n: "Barba" }
+];                                    // los precios los carga el administrador desde el panel (def = precio inicial)
+const HORARIOS = { semana: [18, 22], finde: [10, 22] }; // [primer turno, último turno]; cada turno dura 1 hora
+const DIAS_ADELANTE = 28;
+// =====================
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+document.getElementById("nm").textContent = NOMBRE;
+document.getElementById("lg").textContent = NOMBRE.charAt(0);
+
+let taken = new Set(), reservas = [], resIds = new Set(), precios = null, msgOk = false;
+const ADMIN_PAGE = !/\/(index\.html)?$/.test(location.pathname); // cualquier página distinta de la principal abre la administración
+let view = (ADMIN_PAGE || location.hash === "#admin") ? "admin" : "cliente";
+let user = null, adminErr = "", tab = "turnos", unsubRes = null;
+let step = 1, svc = null, selDay = null, selHour = null, showAll = false, msg = "", done = null, loadErr = false, loaded = false;
+
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const key = (d, h) => d + "_" + pad(h);
+const parse = s => { const p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); };
+const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+const up = s => s.replace(".", "").toUpperCase();
+const longDay = s => parse(s).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+function days() { const o = [], t = new Date(); for (let i = 0; i < DIAS_ADELANTE; i++) { const x = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i); o.push(x); } return o; }
+function isPast(d, h) { const n = new Date(); if (d < iso(n)) return true; return d === iso(n) && h <= n.getHours(); }
+function horasDe(d) { const r = [0, 6].includes(parse(d).getDay()) ? HORARIOS.finde : HORARIOS.semana, o = []; for (let h = r[0]; h <= r[1]; h++) o.push(h); return o; }
+const free = d => horasDe(d).some(h => !taken.has(key(d, h)) && !isPast(d, h));
+const fmt = n => "$ " + Number(n).toLocaleString("es-AR", { minimumFractionDigits: Number.isInteger(+n) ? 0 : 2, maximumFractionDigits: 2 });
+function precioDe(sv) { const v = precios && sv.id in precios ? precios[sv.id] : sv.def; return typeof v === "number" ? v : null; }
+const rango = r => pad(r[0]) + ":00 a " + pad(r[1] + 1) + ":00 hs";
+
+onSnapshot(collection(db, "turnos"), snap => {
+  taken = new Set(snap.docs.map(d => d.id)); loaded = true; loadErr = false;
+  if (!(view === "cliente" && step === 4)) render();
+}, () => { loadErr = true; render(); });
+
+onSnapshot(doc(db, "config", "precios"), snap => {
+  precios = snap.exists() ? snap.data() : null;
+  const typing = view === "cliente" ? step === 4 : tab === "precios";
+  if (!typing) render();
+}, () => {});
+
+onAuthStateChanged(auth, u => {
+  user = u; adminErr = "";
+  if (unsubRes) { unsubRes(); unsubRes = null; }
+  reservas = []; resIds = new Set();
+  if (u) {
+    unsubRes = onSnapshot(collection(db, "reservas"), snap => {
+      reservas = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.id < b.id ? -1 : 1);
+      resIds = new Set(reservas.map(r => r.id)); adminErr = ""; if (view === "admin") render();
+    }, () => { adminErr = "Esta cuenta no tiene permiso para administrar."; if (view === "admin") render(); });
+  }
+  if (view === "admin") render();
+});
+
+function render() {
+  const el = document.getElementById("app");
+  document.getElementById("adm").hidden = view !== "admin";
+  el.innerHTML = view === "admin" ? adminHtml() : clientHtml();
+  bind();
+}
+
+function datesHtml(onlyFree) {
+  const ds = days(), list = showAll ? ds : ds.slice(0, 8);
+  let h = '<div class="dates">';
+  list.forEach(x => { const i = iso(x);
+    h += '<button class="date' + (i === selDay ? " sel" : "") + '" data-day="' + i + '"' + (onlyFree && !free(i) ? " disabled" : "") + '><small>' + up(x.toLocaleDateString("es-AR", { weekday: "short" })) + '</small><b>' + x.getDate() + '</b><small>' + up(x.toLocaleDateString("es-AR", { month: "short" })) + '</small></button>'; });
+  h += "</div>";
+  if (!showAll && ds.length > 8) h += '<button class="more" id="more">Ver más fechas</button>';
+  return h;
+}
+
+function hoursHtml() {
+  return '<div class="hours"><b>Horarios de atención</b><div><span>Lunes a viernes</span><span>' + rango(HORARIOS.semana) + '</span></div><div><span>Sábados y domingos</span><span>' + rango(HORARIOS.finde) + "</span></div></div>";
+}
+
+function clientHtml() {
+  if (done) return '<div class="panel"><h2>Turno reservado</h2><div class="sum"><div><span>Servicio</span><b>' + esc(done.s) + '</b></div><div><span>Fecha</span><b>' + esc(longDay(done.d)) + '</b></div><div><span>Hora</span><b>' + done.h + ':00</b></div><div><span>A nombre de</span><b>' + esc(done.n) + '</b></div><div><span>Dirección</span><b>' + esc(done.dir) + '</b></div></div><p class="hint good">Te esperamos. Si no podés venir, avisanos con tiempo.</p><button class="btn sec" id="again">Reservar otro turno</button></div>';
+  let h = hoursHtml();
+  h += '<div class="step">Paso ' + step + " de 4 - <b>" + ["Servicio", "Fecha", "Horario", "Confirmar"][step - 1] + "</b></div>";
+  if (loadErr) return h + '<div class="panel"><p class="err">No pudimos cargar los horarios. Revisá tu conexión y recargá la página.</p></div>';
+  if (!loaded) return h + '<div class="panel"><p class="hint">Cargando horarios…</p></div>';
+  h += '<div class="panel">';
+  if (step === 1) {
+    h += "<h2>Elegí un servicio</h2>";
+    SERVICIOS.forEach((s, i) => { h += '<button class="item" data-svc="' + i + '"><b><span>' + esc(s.n) + "</span>" + (precioDe(s) !== null ? "<span>" + fmt(precioDe(s)) + "</span>" : "") + "</b></button>"; });
+    h += '<p class="hint">Cada turno dura 1 hora.</p>';
+  }
+  if (step === 2) h += "<h2>Elegí una fecha</h2>" + datesHtml(true);
+  if (step === 3) {
+    h += "<h2>Elegí un horario</h2>" + '<p class="hint" style="margin:-8px 0 12px">' + esc(longDay(selDay)) + "</p>" + '<div class="times">';
+    let n = 0;
+    horasDe(selDay).forEach(hr => { if (!taken.has(key(selDay, hr)) && !isPast(selDay, hr)) { n++; h += '<button class="time" data-hour="' + hr + '">' + hr + ":00</button>"; } });
+    h += "</div>";
+    if (!n) h += '<p class="hint">Ya no quedan horarios este día. Elegí otra fecha.</p>';
+  }
+  if (step === 4) {
+    const sv = SERVICIOS[svc];
+    h += "<h2>Confirmá tu reserva</h2>" + '<div class="sum"><div><span>Servicio</span><b>' + esc(sv.n) + "</b></div><div><span>Fecha</span><b>" + esc(longDay(selDay)) + "</b></div><div><span>Hora</span><b>" + selHour + ":00</b></div>" + (precioDe(sv) !== null ? "<div><span>Precio</span><b>" + fmt(precioDe(sv)) + "</b></div>" : "") + "</div>"
+      + '<label for="n">Tu nombre</label><input id="n" autocomplete="name" maxlength="60" placeholder="Nombre y apellido">'
+      + '<label for="t">Tu teléfono</label><input id="t" type="tel" autocomplete="tel" maxlength="20" placeholder="Para avisarte si hay un cambio">'
+      + '<label for="a">Dirección</label><input id="a" autocomplete="street-address" maxlength="120" placeholder="Ingresá tu dirección">'
+      + '<label for="m">Comentarios (opcional)</label><textarea id="m" rows="2" maxlength="200"></textarea>'
+      + '<button class="btn" id="go" disabled>Confirmar reserva</button>';
+  }
+  if (msg) h += '<p class="err">' + esc(msg) + "</p>";
+  h += "</div>";
+  if (step > 1) h += '<button class="back" id="back">← Volver</button>';
+  return h;
+}
+
+function adminHtml() {
+  if (!user) return '<div class="panel"><h2>Administración</h2><p class="hint" style="margin:0 0 4px">Entrá con tu cuenta de Google para ver y gestionar los turnos.</p><button class="btn" id="login">Entrar con Google</button></div>';
+  if (adminErr) return '<div class="panel"><h2>Administración</h2><p class="err">' + esc(adminErr) + '</p><button class="btn sec" id="logout">Salir</button></div>';
+  let h = '<div class="tabs"><button class="tab' + (tab === "turnos" ? " sel" : "") + '" data-tab="turnos">Turnos</button><button class="tab' + (tab === "bloq" ? " sel" : "") + '" data-tab="bloq">Bloquear horarios</button><button class="tab' + (tab === "precios" ? " sel" : "") + '" data-tab="precios">Precios</button></div><div class="panel">';
+  if (tab === "turnos") {
+    const hoy = iso(new Date()), prox = reservas.filter(r => r.id.slice(0, 10) >= hoy);
+    h += "<h2>Próximos turnos</h2>";
+    if (!prox.length) h += '<p class="hint">Todavía no hay turnos reservados.</p>';
+    prox.forEach(r => { const d = r.id.slice(0, 10), hr = +r.id.slice(11), tel = String(r.telefono || "").replace(/[^0-9+]/g, "");
+      h += '<div class="res"><b>' + esc(longDay(d)) + " · " + hr + ":00</b><p>" + esc(r.nombre || "") + (tel ? ' · <a href="tel:' + esc(tel) + '">' + esc(r.telefono) + "</a>" : "") + "</p>" + (r.servicio ? "<p>" + esc(r.servicio) + "</p>" : "") + (r.direccion ? "<p>Dirección: " + esc(r.direccion) + "</p>" : "") + (r.nota ? "<p>" + esc(r.nota) + "</p>" : "") + '<button data-cancel="' + esc(r.id) + '">Cancelar turno</button></div>'; });
+  } else if (tab === "precios") {
+    h += "<h2>Precios de los servicios</h2>";
+    SERVICIOS.forEach(sv => { const v = precioDe(sv); h += '<label for="p-' + sv.id + '">' + esc(sv.n) + '</label><input id="p-' + sv.id + '" data-precio="' + sv.id + '" type="number" inputmode="decimal" min="0" step="any" placeholder="Sin precio" value="' + (v === null ? "" : v) + '">'; });
+    h += '<button class="btn" id="savep">Guardar precios</button><p class="hint">Dejá un campo vacío para no mostrar precio en ese servicio.</p>';
+    if (msg) h += '<p class="' + (msgOk ? "hint good" : "err") + '">' + esc(msg) + "</p>";
+  } else {
+    h += "<h2>Bloquear horarios</h2>" + datesHtml(false);
+    if (selDay) {
+      h += '<p class="hint">' + esc(longDay(selDay)) + ". Tocá un horario para bloquearlo o liberarlo.</p><div class=\"times\" style=\"margin-top:10px\">";
+      horasDe(selDay).forEach(hr => { const k = key(selDay, hr); h += '<button class="time' + (taken.has(k) ? " off" : "") + '" data-blk="' + k + '">' + hr + ":00</button>"; });
+      h += "</div>";
+    }
+    if (msg) h += '<p class="err">' + esc(msg) + "</p>";
+  }
+  h += '</div><button class="back" id="logout">Salir</button>';
+  return h;
+}
+
+function bind() {
+  const on = (s, f) => document.querySelectorAll(s).forEach(b => b.onclick = () => f(b));
+  on("[data-svc]", b => { svc = +b.dataset.svc; step = 2; msg = ""; render(); });
+  on("[data-day]", b => { selDay = b.dataset.day; msg = ""; if (view === "cliente") step = 3; render(); });
+  on("[data-hour]", b => { selHour = +b.dataset.hour; step = 4; msg = ""; render(); });
+  on("[data-tab]", b => { tab = b.dataset.tab; msg = ""; msgOk = false; render(); });
+  on("[data-blk]", async b => { const k = b.dataset.blk; msg = "";
+    try { const bt = writeBatch(db);
+      if (taken.has(k)) { if (resIds.has(k)) { msg = "Ese horario tiene una reserva. Cancelala desde Turnos."; render(); return; } bt.delete(doc(db, "turnos", k)); }
+      else bt.set(doc(db, "turnos", k), { ok: true });
+      await bt.commit(); } catch (e) { msg = "No se pudo guardar el cambio."; render(); } });
+  on("[data-cancel]", async b => { const k = b.dataset.cancel;
+    if (!confirm("¿Cancelar este turno? El horario vuelve a quedar libre.")) return;
+    try { const bt = writeBatch(db); bt.delete(doc(db, "reservas", k)); bt.delete(doc(db, "turnos", k)); await bt.commit(); } catch (e) { alert("No se pudo cancelar el turno."); } });
+  const q = id => document.getElementById(id);
+  if (q("savep")) q("savep").onclick = async () => {
+    const data = {}; let bad = false;
+    document.querySelectorAll("[data-precio]").forEach(i => {
+      const v = i.value.trim();
+      if (v === "") data[i.dataset.precio] = null;
+      else { const n = Number(v.replace(",", ".")); if (!isFinite(n) || n < 0) bad = true; else data[i.dataset.precio] = n; }
+    });
+    if (bad) { msg = "Ingresá precios válidos (números de 0 en adelante)."; msgOk = false; render(); return; }
+    try { await setDoc(doc(db, "config", "precios"), data); msg = "Precios guardados."; msgOk = true; }
+    catch (e) { msg = "No se pudo guardar. Revisá que las reglas de Firebase estén actualizadas."; msgOk = false; }
+    render();
+  };
+  if (q("more")) q("more").onclick = () => { showAll = true; render(); };
+  if (q("back")) q("back").onclick = () => { step--; msg = ""; render(); };
+  if (q("again")) q("again").onclick = () => { done = null; step = 1; svc = selDay = selHour = null; render(); };
+  if (q("login")) q("login").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => { adminErr = "No se pudo iniciar sesión."; render(); });
+  if (q("logout")) q("logout").onclick = () => signOut(auth);
+  if (q("go")) {
+    const n = q("n"), t = q("t"), a = q("a"), upd = () => q("go").disabled = n.value.trim().length < 2 || t.value.replace(/\D/g, "").length < 6 || a.value.trim().length < 1;
+    n.oninput = upd; t.oninput = upd; a.oninput = upd; q("go").onclick = reservar;
+  }
+}
+
+async function reservar() {
+  const btn = document.getElementById("go"); btn.disabled = true; btn.textContent = "Reservando…"; msg = "";
+  const n = document.getElementById("n").value.trim(), t = document.getElementById("t").value.trim(), dir = document.getElementById("a").value.trim(), m = document.getElementById("m").value.trim();
+  if (!dir) { msg = "Ingresá tu dirección para reservar."; render(); return; }
+  const k = key(selDay, selHour);
+  try {
+    const bt = writeBatch(db);
+    bt.set(doc(db, "turnos", k), { ok: true });
+    bt.set(doc(db, "reservas", k), { nombre: n, telefono: t, direccion: dir, servicio: SERVICIOS[svc].n, nota: m, creado: serverTimestamp() });
+    await bt.commit();
+    done = { d: selDay, h: selHour, n, dir, s: SERVICIOS[svc].n }; render();
+  } catch (e) {
+    if (e && e.code === "permission-denied") { msg = "Ese horario se acaba de ocupar. Elegí otro."; step = 3; }
+    else { msg = "No se pudo reservar. Revisá tu conexión e intentá de nuevo."; }
+    render();
+  }
+}
+
+document.getElementById("adm").onclick = () => { if (ADMIN_PAGE) { location.href = "./"; return; } history.replaceState(null, "", location.pathname + location.search); view = "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); };
+window.addEventListener("hashchange", () => { view = (ADMIN_PAGE || location.hash === "#admin") ? "admin" : "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); });
+render();
+</script>
+</body>
+</html>

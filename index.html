@@ -46,7 +46,7 @@ input,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radiu
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn.sec{background:var(--card2);color:var(--ink);border:1px solid var(--line)}
 .tabs{display:flex;gap:8px;margin-bottom:16px}
-.tab{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
+.tab{flex:1;padding:10px 6px;font-size:14px;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
 .tab.sel{border-color:var(--ink)}
 .res{border:1px solid var(--line);border-radius:12px;background:var(--card2);padding:12px;margin-bottom:10px}
 .res b{display:block;font:500 17px var(--serif)}
@@ -71,7 +71,7 @@ footer button{background:none;border:0;color:var(--mute);font-size:12px}
 <footer><button id="adm" hidden>Volver a reservas</button></footer>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, onSnapshot, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, writeBatch, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // === Configuración ===
@@ -85,10 +85,10 @@ const firebaseConfig = {
 };
 const NOMBRE = "Barbería";            // nombre que se muestra arriba
 const SERVICIOS = [
-  { n: "Corte", p: "$8.000" },
-  { n: "Corte y barba" },
-  { n: "Barba" }
-];                                    // p = precio (opcional): agregalo cuando lo definas
+  { id: "corte", n: "Corte", def: 8000 },
+  { id: "corteybarba", n: "Corte y barba" },
+  { id: "barba", n: "Barba" }
+];                                    // los precios los carga el administrador desde el panel (def = precio inicial)
 const HORARIOS = { semana: [18, 22], finde: [10, 22] }; // [primer turno, último turno]; cada turno dura 1 hora
 const DIAS_ADELANTE = 28;
 // =====================
@@ -100,8 +100,9 @@ const auth = getAuth(app);
 document.getElementById("nm").textContent = NOMBRE;
 document.getElementById("lg").textContent = NOMBRE.charAt(0);
 
-let taken = new Set(), reservas = [], resIds = new Set();
-let view = location.hash === "#admin" ? "admin" : "cliente";
+let taken = new Set(), reservas = [], resIds = new Set(), precios = null, msgOk = false;
+const ADMIN_PAGE = !/\/(index\.html)?$/.test(location.pathname); // cualquier página distinta de la principal abre la administración
+let view = (ADMIN_PAGE || location.hash === "#admin") ? "admin" : "cliente";
 let user = null, adminErr = "", tab = "turnos", unsubRes = null;
 let step = 1, svc = null, selDay = null, selHour = null, showAll = false, msg = "", done = null, loadErr = false, loaded = false;
 
@@ -116,12 +117,20 @@ function days() { const o = [], t = new Date(); for (let i = 0; i < DIAS_ADELANT
 function isPast(d, h) { const n = new Date(); if (d < iso(n)) return true; return d === iso(n) && h <= n.getHours(); }
 function horasDe(d) { const r = [0, 6].includes(parse(d).getDay()) ? HORARIOS.finde : HORARIOS.semana, o = []; for (let h = r[0]; h <= r[1]; h++) o.push(h); return o; }
 const free = d => horasDe(d).some(h => !taken.has(key(d, h)) && !isPast(d, h));
+const fmt = n => "$ " + Number(n).toLocaleString("es-AR", { minimumFractionDigits: Number.isInteger(+n) ? 0 : 2, maximumFractionDigits: 2 });
+function precioDe(sv) { const v = precios && sv.id in precios ? precios[sv.id] : sv.def; return typeof v === "number" ? v : null; }
 const rango = r => pad(r[0]) + ":00 a " + pad(r[1] + 1) + ":00 hs";
 
 onSnapshot(collection(db, "turnos"), snap => {
   taken = new Set(snap.docs.map(d => d.id)); loaded = true; loadErr = false;
   if (!(view === "cliente" && step === 4)) render();
 }, () => { loadErr = true; render(); });
+
+onSnapshot(doc(db, "config", "precios"), snap => {
+  precios = snap.exists() ? snap.data() : null;
+  const typing = view === "cliente" ? step === 4 : tab === "precios";
+  if (!typing) render();
+}, () => {});
 
 onAuthStateChanged(auth, u => {
   user = u; adminErr = "";
@@ -166,7 +175,7 @@ function clientHtml() {
   h += '<div class="panel">';
   if (step === 1) {
     h += "<h2>Elegí un servicio</h2>";
-    SERVICIOS.forEach((s, i) => { h += '<button class="item" data-svc="' + i + '"><b><span>' + esc(s.n) + "</span>" + (s.p ? "<span>" + esc(s.p) + "</span>" : "") + "</b></button>"; });
+    SERVICIOS.forEach((s, i) => { h += '<button class="item" data-svc="' + i + '"><b><span>' + esc(s.n) + "</span>" + (precioDe(s) !== null ? "<span>" + fmt(precioDe(s)) + "</span>" : "") + "</b></button>"; });
     h += '<p class="hint">Cada turno dura 1 hora.</p>';
   }
   if (step === 2) h += "<h2>Elegí una fecha</h2>" + datesHtml(true);
@@ -179,7 +188,7 @@ function clientHtml() {
   }
   if (step === 4) {
     const sv = SERVICIOS[svc];
-    h += "<h2>Confirmá tu reserva</h2>" + '<div class="sum"><div><span>Servicio</span><b>' + esc(sv.n) + "</b></div><div><span>Fecha</span><b>" + esc(longDay(selDay)) + "</b></div><div><span>Hora</span><b>" + selHour + ":00</b></div>" + (sv.p ? "<div><span>Precio</span><b>" + esc(sv.p) + "</b></div>" : "") + "</div>"
+    h += "<h2>Confirmá tu reserva</h2>" + '<div class="sum"><div><span>Servicio</span><b>' + esc(sv.n) + "</b></div><div><span>Fecha</span><b>" + esc(longDay(selDay)) + "</b></div><div><span>Hora</span><b>" + selHour + ":00</b></div>" + (precioDe(sv) !== null ? "<div><span>Precio</span><b>" + fmt(precioDe(sv)) + "</b></div>" : "") + "</div>"
       + '<label for="n">Tu nombre</label><input id="n" autocomplete="name" maxlength="60" placeholder="Nombre y apellido">'
       + '<label for="t">Tu teléfono</label><input id="t" type="tel" autocomplete="tel" maxlength="20" placeholder="Para avisarte si hay un cambio">'
       + '<label for="a">Dirección</label><input id="a" autocomplete="street-address" maxlength="120" placeholder="Ingresá tu dirección">'
@@ -195,13 +204,18 @@ function clientHtml() {
 function adminHtml() {
   if (!user) return '<div class="panel"><h2>Administración</h2><p class="hint" style="margin:0 0 4px">Entrá con tu cuenta de Google para ver y gestionar los turnos.</p><button class="btn" id="login">Entrar con Google</button></div>';
   if (adminErr) return '<div class="panel"><h2>Administración</h2><p class="err">' + esc(adminErr) + '</p><button class="btn sec" id="logout">Salir</button></div>';
-  let h = '<div class="tabs"><button class="tab' + (tab === "turnos" ? " sel" : "") + '" data-tab="turnos">Turnos</button><button class="tab' + (tab === "bloq" ? " sel" : "") + '" data-tab="bloq">Bloquear horarios</button></div><div class="panel">';
+  let h = '<div class="tabs"><button class="tab' + (tab === "turnos" ? " sel" : "") + '" data-tab="turnos">Turnos</button><button class="tab' + (tab === "bloq" ? " sel" : "") + '" data-tab="bloq">Bloquear horarios</button><button class="tab' + (tab === "precios" ? " sel" : "") + '" data-tab="precios">Precios</button></div><div class="panel">';
   if (tab === "turnos") {
     const hoy = iso(new Date()), prox = reservas.filter(r => r.id.slice(0, 10) >= hoy);
     h += "<h2>Próximos turnos</h2>";
     if (!prox.length) h += '<p class="hint">Todavía no hay turnos reservados.</p>';
     prox.forEach(r => { const d = r.id.slice(0, 10), hr = +r.id.slice(11), tel = String(r.telefono || "").replace(/[^0-9+]/g, "");
       h += '<div class="res"><b>' + esc(longDay(d)) + " · " + hr + ":00</b><p>" + esc(r.nombre || "") + (tel ? ' · <a href="tel:' + esc(tel) + '">' + esc(r.telefono) + "</a>" : "") + "</p>" + (r.servicio ? "<p>" + esc(r.servicio) + "</p>" : "") + (r.direccion ? "<p>Dirección: " + esc(r.direccion) + "</p>" : "") + (r.nota ? "<p>" + esc(r.nota) + "</p>" : "") + '<button data-cancel="' + esc(r.id) + '">Cancelar turno</button></div>'; });
+  } else if (tab === "precios") {
+    h += "<h2>Precios de los servicios</h2>";
+    SERVICIOS.forEach(sv => { const v = precioDe(sv); h += '<label for="p-' + sv.id + '">' + esc(sv.n) + '</label><input id="p-' + sv.id + '" data-precio="' + sv.id + '" type="number" inputmode="decimal" min="0" step="any" placeholder="Sin precio" value="' + (v === null ? "" : v) + '">'; });
+    h += '<button class="btn" id="savep">Guardar precios</button><p class="hint">Dejá un campo vacío para no mostrar precio en ese servicio.</p>';
+    if (msg) h += '<p class="' + (msgOk ? "hint good" : "err") + '">' + esc(msg) + "</p>";
   } else {
     h += "<h2>Bloquear horarios</h2>" + datesHtml(false);
     if (selDay) {
@@ -220,7 +234,7 @@ function bind() {
   on("[data-svc]", b => { svc = +b.dataset.svc; step = 2; msg = ""; render(); });
   on("[data-day]", b => { selDay = b.dataset.day; msg = ""; if (view === "cliente") step = 3; render(); });
   on("[data-hour]", b => { selHour = +b.dataset.hour; step = 4; msg = ""; render(); });
-  on("[data-tab]", b => { tab = b.dataset.tab; msg = ""; render(); });
+  on("[data-tab]", b => { tab = b.dataset.tab; msg = ""; msgOk = false; render(); });
   on("[data-blk]", async b => { const k = b.dataset.blk; msg = "";
     try { const bt = writeBatch(db);
       if (taken.has(k)) { if (resIds.has(k)) { msg = "Ese horario tiene una reserva. Cancelala desde Turnos."; render(); return; } bt.delete(doc(db, "turnos", k)); }
@@ -230,6 +244,18 @@ function bind() {
     if (!confirm("¿Cancelar este turno? El horario vuelve a quedar libre.")) return;
     try { const bt = writeBatch(db); bt.delete(doc(db, "reservas", k)); bt.delete(doc(db, "turnos", k)); await bt.commit(); } catch (e) { alert("No se pudo cancelar el turno."); } });
   const q = id => document.getElementById(id);
+  if (q("savep")) q("savep").onclick = async () => {
+    const data = {}; let bad = false;
+    document.querySelectorAll("[data-precio]").forEach(i => {
+      const v = i.value.trim();
+      if (v === "") data[i.dataset.precio] = null;
+      else { const n = Number(v.replace(",", ".")); if (!isFinite(n) || n < 0) bad = true; else data[i.dataset.precio] = n; }
+    });
+    if (bad) { msg = "Ingresá precios válidos (números de 0 en adelante)."; msgOk = false; render(); return; }
+    try { await setDoc(doc(db, "config", "precios"), data); msg = "Precios guardados."; msgOk = true; }
+    catch (e) { msg = "No se pudo guardar. Revisá que las reglas de Firebase estén actualizadas."; msgOk = false; }
+    render();
+  };
   if (q("more")) q("more").onclick = () => { showAll = true; render(); };
   if (q("back")) q("back").onclick = () => { step--; msg = ""; render(); };
   if (q("again")) q("again").onclick = () => { done = null; step = 1; svc = selDay = selHour = null; render(); };
@@ -259,8 +285,8 @@ async function reservar() {
   }
 }
 
-document.getElementById("adm").onclick = () => { history.replaceState(null, "", location.pathname + location.search); view = "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); };
-window.addEventListener("hashchange", () => { view = location.hash === "#admin" ? "admin" : "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); });
+document.getElementById("adm").onclick = () => { if (ADMIN_PAGE) { location.href = "./"; return; } history.replaceState(null, "", location.pathname + location.search); view = "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); };
+window.addEventListener("hashchange", () => { view = (ADMIN_PAGE || location.hash === "#admin") ? "admin" : "cliente"; msg = ""; showAll = false; selDay = null; step = 1; render(); });
 render();
 </script>
 </body>
