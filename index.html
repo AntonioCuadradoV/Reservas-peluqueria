@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Reservá tu turno</title>
+<title>Barbería · Reservá tu turno</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap">
 <style>
@@ -53,6 +53,13 @@ input,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radiu
 .res p{margin:4px 0;color:var(--mute);font-size:14px}
 .res a{color:var(--ink)}
 .res button{margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--err)}
+.hours{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:14px}
+.hours b{display:block;font:500 17px var(--serif);margin-bottom:8px}
+.hours div{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--mute)}
+.hours div span:last-child{color:var(--ink)}
+.item{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:16px 14px;margin-bottom:10px}
+.item b{display:flex;justify-content:space-between;gap:12px;font:500 18px var(--serif)}
+.item:hover{border-color:var(--ink)}
 footer{text-align:center;padding:8px 16px 28px}
 footer button{background:none;border:0;color:var(--mute);font-size:12px}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
@@ -76,10 +83,13 @@ const firebaseConfig = {
   messagingSenderId: "972935083950",
   appId: "1:972935083950:web:18cc2e783c51e4f2a4ba3f"
 };
-const NOMBRE = "Peluquería";           // nombre que se muestra arriba
-const SERVICIO = "Corte de cabello";
-const PRECIO = "$8.000";
-const HORAS = [18, 19, 20, 21];       // turnos de 1 hora, de 18 a 22
+const NOMBRE = "Barbería";            // nombre que se muestra arriba
+const SERVICIOS = [
+  { n: "Corte", p: "$8.000" },
+  { n: "Corte y barba" },
+  { n: "Barba" }
+];                                    // p = precio (opcional): agregalo cuando lo definas
+const HORARIOS = { semana: [18, 22], finde: [10, 22] }; // [primer turno, último turno]; cada turno dura 1 hora
 const DIAS_ADELANTE = 28;
 // =====================
 
@@ -93,7 +103,7 @@ document.getElementById("lg").textContent = NOMBRE.charAt(0);
 let taken = new Set(), reservas = [], resIds = new Set();
 let view = location.hash === "#admin" ? "admin" : "cliente";
 let user = null, adminErr = "", tab = "turnos", unsubRes = null;
-let step = 1, selDay = null, selHour = null, showAll = false, msg = "", done = null, loadErr = false, loaded = false;
+let step = 1, svc = null, selDay = null, selHour = null, showAll = false, msg = "", done = null, loadErr = false, loaded = false;
 
 const pad = n => String(n).padStart(2, "0");
 const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
@@ -102,13 +112,15 @@ const parse = s => { const p = s.split("-"); return new Date(+p[0], +p[1] - 1, +
 const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
 const up = s => s.replace(".", "").toUpperCase();
 const longDay = s => parse(s).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
-function days() { const o = [], t = new Date(); for (let i = 0; i < DIAS_ADELANTE; i++) { const x = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i); if (x.getDay() >= 1 && x.getDay() <= 5) o.push(x); } return o; }
+function days() { const o = [], t = new Date(); for (let i = 0; i < DIAS_ADELANTE; i++) { const x = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i); o.push(x); } return o; }
 function isPast(d, h) { const n = new Date(); if (d < iso(n)) return true; return d === iso(n) && h <= n.getHours(); }
-const free = d => HORAS.some(h => !taken.has(key(d, h)) && !isPast(d, h));
+function horasDe(d) { const r = [0, 6].includes(parse(d).getDay()) ? HORARIOS.finde : HORARIOS.semana, o = []; for (let h = r[0]; h <= r[1]; h++) o.push(h); return o; }
+const free = d => horasDe(d).some(h => !taken.has(key(d, h)) && !isPast(d, h));
+const rango = r => pad(r[0]) + ":00 a " + pad(r[1] + 1) + ":00 hs";
 
 onSnapshot(collection(db, "turnos"), snap => {
   taken = new Set(snap.docs.map(d => d.id)); loaded = true; loadErr = false;
-  if (!(view === "cliente" && step === 3)) render();
+  if (!(view === "cliente" && step === 4)) render();
 }, () => { loadErr = true; render(); });
 
 onAuthStateChanged(auth, u => {
@@ -141,25 +153,36 @@ function datesHtml(onlyFree) {
   return h;
 }
 
+function hoursHtml() {
+  return '<div class="hours"><b>Horarios de atención</b><div><span>Lunes a viernes</span><span>' + rango(HORARIOS.semana) + '</span></div><div><span>Sábados y domingos</span><span>' + rango(HORARIOS.finde) + "</span></div></div>";
+}
+
 function clientHtml() {
-  if (done) return '<div class="panel"><h2>Turno reservado</h2><div class="sum"><div><span>Servicio</span><b>' + esc(SERVICIO) + '</b></div><div><span>Fecha</span><b>' + esc(longDay(done.d)) + '</b></div><div><span>Hora</span><b>' + done.h + ':00</b></div><div><span>A nombre de</span><b>' + esc(done.n) + '</b></div></div><p class="hint good">Te esperamos. Si no podés venir, avisanos con tiempo.</p><button class="btn sec" id="again">Reservar otro turno</button></div>';
-  let h = '<p class="intro">' + esc(SERVICIO) + " · " + PRECIO + " · 60 minutos</p>";
-  h += '<div class="step">Paso ' + step + " de 3 - <b>" + ["Fecha", "Horario", "Confirmar"][step - 1] + "</b></div>";
+  if (done) return '<div class="panel"><h2>Turno reservado</h2><div class="sum"><div><span>Servicio</span><b>' + esc(done.s) + '</b></div><div><span>Fecha</span><b>' + esc(longDay(done.d)) + '</b></div><div><span>Hora</span><b>' + done.h + ':00</b></div><div><span>A nombre de</span><b>' + esc(done.n) + '</b></div><div><span>Dirección</span><b>' + esc(done.dir) + '</b></div></div><p class="hint good">Te esperamos. Si no podés venir, avisanos con tiempo.</p><button class="btn sec" id="again">Reservar otro turno</button></div>';
+  let h = hoursHtml();
+  h += '<div class="step">Paso ' + step + " de 4 - <b>" + ["Servicio", "Fecha", "Horario", "Confirmar"][step - 1] + "</b></div>";
   if (loadErr) return h + '<div class="panel"><p class="err">No pudimos cargar los horarios. Revisá tu conexión y recargá la página.</p></div>';
   if (!loaded) return h + '<div class="panel"><p class="hint">Cargando horarios…</p></div>';
   h += '<div class="panel">';
-  if (step === 1) h += "<h2>Elegí una fecha</h2>" + datesHtml(true) + '<p class="hint">Atendemos de lunes a viernes de 18 a 22.</p>';
-  if (step === 2) {
+  if (step === 1) {
+    h += "<h2>Elegí un servicio</h2>";
+    SERVICIOS.forEach((s, i) => { h += '<button class="item" data-svc="' + i + '"><b><span>' + esc(s.n) + "</span>" + (s.p ? "<span>" + esc(s.p) + "</span>" : "") + "</b></button>"; });
+    h += '<p class="hint">Cada turno dura 1 hora.</p>';
+  }
+  if (step === 2) h += "<h2>Elegí una fecha</h2>" + datesHtml(true);
+  if (step === 3) {
     h += "<h2>Elegí un horario</h2>" + '<p class="hint" style="margin:-8px 0 12px">' + esc(longDay(selDay)) + "</p>" + '<div class="times">';
     let n = 0;
-    HORAS.forEach(hr => { if (!taken.has(key(selDay, hr)) && !isPast(selDay, hr)) { n++; h += '<button class="time" data-hour="' + hr + '">' + hr + ":00</button>"; } });
+    horasDe(selDay).forEach(hr => { if (!taken.has(key(selDay, hr)) && !isPast(selDay, hr)) { n++; h += '<button class="time" data-hour="' + hr + '">' + hr + ":00</button>"; } });
     h += "</div>";
     if (!n) h += '<p class="hint">Ya no quedan horarios este día. Elegí otra fecha.</p>';
   }
-  if (step === 3) {
-    h += "<h2>Confirmá tu reserva</h2>" + '<div class="sum"><div><span>Servicio</span><b>' + esc(SERVICIO) + "</b></div><div><span>Fecha</span><b>" + esc(longDay(selDay)) + "</b></div><div><span>Hora</span><b>" + selHour + ":00</b></div><div><span>Precio</span><b>" + PRECIO + "</b></div></div>"
+  if (step === 4) {
+    const sv = SERVICIOS[svc];
+    h += "<h2>Confirmá tu reserva</h2>" + '<div class="sum"><div><span>Servicio</span><b>' + esc(sv.n) + "</b></div><div><span>Fecha</span><b>" + esc(longDay(selDay)) + "</b></div><div><span>Hora</span><b>" + selHour + ":00</b></div>" + (sv.p ? "<div><span>Precio</span><b>" + esc(sv.p) + "</b></div>" : "") + "</div>"
       + '<label for="n">Tu nombre</label><input id="n" autocomplete="name" maxlength="60" placeholder="Nombre y apellido">'
       + '<label for="t">Tu teléfono</label><input id="t" type="tel" autocomplete="tel" maxlength="20" placeholder="Para avisarte si hay un cambio">'
+      + '<label for="a">Dirección</label><input id="a" autocomplete="street-address" maxlength="120" placeholder="Ingresá tu dirección">'
       + '<label for="m">Comentarios (opcional)</label><textarea id="m" rows="2" maxlength="200"></textarea>'
       + '<button class="btn" id="go" disabled>Confirmar reserva</button>';
   }
@@ -178,12 +201,12 @@ function adminHtml() {
     h += "<h2>Próximos turnos</h2>";
     if (!prox.length) h += '<p class="hint">Todavía no hay turnos reservados.</p>';
     prox.forEach(r => { const d = r.id.slice(0, 10), hr = +r.id.slice(11), tel = String(r.telefono || "").replace(/[^0-9+]/g, "");
-      h += '<div class="res"><b>' + esc(longDay(d)) + " · " + hr + ":00</b><p>" + esc(r.nombre || "") + (tel ? ' · <a href="tel:' + esc(tel) + '">' + esc(r.telefono) + "</a>" : "") + "</p>" + (r.nota ? "<p>" + esc(r.nota) + "</p>" : "") + '<button data-cancel="' + esc(r.id) + '">Cancelar turno</button></div>'; });
+      h += '<div class="res"><b>' + esc(longDay(d)) + " · " + hr + ":00</b><p>" + esc(r.nombre || "") + (tel ? ' · <a href="tel:' + esc(tel) + '">' + esc(r.telefono) + "</a>" : "") + "</p>" + (r.servicio ? "<p>" + esc(r.servicio) + "</p>" : "") + (r.direccion ? "<p>Dirección: " + esc(r.direccion) + "</p>" : "") + (r.nota ? "<p>" + esc(r.nota) + "</p>" : "") + '<button data-cancel="' + esc(r.id) + '">Cancelar turno</button></div>'; });
   } else {
     h += "<h2>Bloquear horarios</h2>" + datesHtml(false);
     if (selDay) {
       h += '<p class="hint">' + esc(longDay(selDay)) + ". Tocá un horario para bloquearlo o liberarlo.</p><div class=\"times\" style=\"margin-top:10px\">";
-      HORAS.forEach(hr => { const k = key(selDay, hr); h += '<button class="time' + (taken.has(k) ? " off" : "") + '" data-blk="' + k + '">' + hr + ":00</button>"; });
+      horasDe(selDay).forEach(hr => { const k = key(selDay, hr); h += '<button class="time' + (taken.has(k) ? " off" : "") + '" data-blk="' + k + '">' + hr + ":00</button>"; });
       h += "</div>";
     }
     if (msg) h += '<p class="err">' + esc(msg) + "</p>";
@@ -194,8 +217,9 @@ function adminHtml() {
 
 function bind() {
   const on = (s, f) => document.querySelectorAll(s).forEach(b => b.onclick = () => f(b));
-  on("[data-day]", b => { selDay = b.dataset.day; msg = ""; if (view === "cliente") step = 2; render(); });
-  on("[data-hour]", b => { selHour = +b.dataset.hour; step = 3; msg = ""; render(); });
+  on("[data-svc]", b => { svc = +b.dataset.svc; step = 2; msg = ""; render(); });
+  on("[data-day]", b => { selDay = b.dataset.day; msg = ""; if (view === "cliente") step = 3; render(); });
+  on("[data-hour]", b => { selHour = +b.dataset.hour; step = 4; msg = ""; render(); });
   on("[data-tab]", b => { tab = b.dataset.tab; msg = ""; render(); });
   on("[data-blk]", async b => { const k = b.dataset.blk; msg = "";
     try { const bt = writeBatch(db);
@@ -208,27 +232,28 @@ function bind() {
   const q = id => document.getElementById(id);
   if (q("more")) q("more").onclick = () => { showAll = true; render(); };
   if (q("back")) q("back").onclick = () => { step--; msg = ""; render(); };
-  if (q("again")) q("again").onclick = () => { done = null; step = 1; selDay = selHour = null; render(); };
+  if (q("again")) q("again").onclick = () => { done = null; step = 1; svc = selDay = selHour = null; render(); };
   if (q("login")) q("login").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => { adminErr = "No se pudo iniciar sesión."; render(); });
   if (q("logout")) q("logout").onclick = () => signOut(auth);
   if (q("go")) {
-    const n = q("n"), t = q("t"), upd = () => q("go").disabled = n.value.trim().length < 2 || t.value.replace(/\D/g, "").length < 6;
-    n.oninput = upd; t.oninput = upd; q("go").onclick = reservar;
+    const n = q("n"), t = q("t"), a = q("a"), upd = () => q("go").disabled = n.value.trim().length < 2 || t.value.replace(/\D/g, "").length < 6 || a.value.trim().length < 1;
+    n.oninput = upd; t.oninput = upd; a.oninput = upd; q("go").onclick = reservar;
   }
 }
 
 async function reservar() {
   const btn = document.getElementById("go"); btn.disabled = true; btn.textContent = "Reservando…"; msg = "";
-  const n = document.getElementById("n").value.trim(), t = document.getElementById("t").value.trim(), m = document.getElementById("m").value.trim();
+  const n = document.getElementById("n").value.trim(), t = document.getElementById("t").value.trim(), dir = document.getElementById("a").value.trim(), m = document.getElementById("m").value.trim();
+  if (!dir) { msg = "Ingresá tu dirección para reservar."; render(); return; }
   const k = key(selDay, selHour);
   try {
     const bt = writeBatch(db);
     bt.set(doc(db, "turnos", k), { ok: true });
-    bt.set(doc(db, "reservas", k), { nombre: n, telefono: t, nota: m, creado: serverTimestamp() });
+    bt.set(doc(db, "reservas", k), { nombre: n, telefono: t, direccion: dir, servicio: SERVICIOS[svc].n, nota: m, creado: serverTimestamp() });
     await bt.commit();
-    done = { d: selDay, h: selHour, n }; render();
+    done = { d: selDay, h: selHour, n, dir, s: SERVICIOS[svc].n }; render();
   } catch (e) {
-    if (e && e.code === "permission-denied") { msg = "Ese horario se acaba de ocupar. Elegí otro."; step = 2; }
+    if (e && e.code === "permission-denied") { msg = "Ese horario se acaba de ocupar. Elegí otro."; step = 3; }
     else { msg = "No se pudo reservar. Revisá tu conexión e intentá de nuevo."; }
     render();
   }
