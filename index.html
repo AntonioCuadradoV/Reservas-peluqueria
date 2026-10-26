@@ -89,7 +89,7 @@ const SERVICIOS = [
   { id: "corteybarba", n: "Corte y barba" },
   { id: "barba", n: "Barba" }
 ];                                    // los precios los carga el administrador desde el panel (def = precio inicial)
-const HORARIOS = { semana: [18, 22], finde: [10, 22] }; // [primer turno, último turno]; cada turno dura 1 hora
+const HORARIOS = { semana: [18, 23], finde: [10, 23] }; // [primer turno, último turno]; cada turno dura 1 hora
 const DIAS_ADELANTE = 28;
 // =====================
 
@@ -119,7 +119,7 @@ function horasDe(d) { const r = [0, 6].includes(parse(d).getDay()) ? HORARIOS.fi
 const free = d => horasDe(d).some(h => !taken.has(key(d, h)) && !isPast(d, h));
 const fmt = n => "$ " + Number(n).toLocaleString("es-AR", { minimumFractionDigits: Number.isInteger(+n) ? 0 : 2, maximumFractionDigits: 2 });
 function precioDe(sv) { const v = precios && sv.id in precios ? precios[sv.id] : sv.def; return typeof v === "number" ? v : null; }
-const rango = r => pad(r[0]) + ":00 a " + pad(r[1] + 1) + ":00 hs";
+const rango = r => pad(r[0]) + ":00 a " + pad((r[1] + 1) % 24) + ":00 hs";
 
 onSnapshot(collection(db, "turnos"), snap => {
   taken = new Set(snap.docs.map(d => d.id)); loaded = true; loadErr = false;
